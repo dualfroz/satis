@@ -77,7 +77,7 @@ class PurgeCommand extends BaseCommand
         }
 
         $packageSelection = new PackageSelection($output, $outputDir, $config, false);
-        $packages = $packageSelection->load();
+        $packages = $packageSelection->load(true);
 
         $satis_homepage = getenv('SATIS_HOMEPAGE');
         $prefix = sprintf(

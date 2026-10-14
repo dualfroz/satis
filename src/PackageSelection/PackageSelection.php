@@ -293,7 +293,7 @@ class PackageSelection
     /**
      * @return PackageInterface[]
      */
-    public function load(): array
+    public function load(bool $failOnMissingInclude = false): array
     {
         $packages = [];
         $rootJsonFile = new JsonFile($this->filename);
@@ -330,11 +330,17 @@ class PackageSelection
             $includedJsonFile = new JsonFile($dirname . '/' . $file);
 
             if (!$includedJsonFile->exists()) {
-                $this->output->writeln(sprintf(
-                    '<error>File \'%s\' does not exist, defined in "includes" in \'%s\'</error>',
+                $message = sprintf(
+                    'File \'%s\' does not exist, defined in "includes" in \'%s\'',
                     $includedJsonFile->getPath(),
                     $rootJsonFile->getPath()
-                ));
+                );
+
+                if ($failOnMissingInclude) {
+                    throw new \RuntimeException($message);
+                }
+
+                $this->output->writeln('<error>' . $message . '</error>');
 
                 continue;
             }

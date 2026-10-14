@@ -534,6 +534,55 @@ class PurgeCommandTest extends TestCase
         self::assertStringContainsString('Removed empty directory', $tester->getDisplay());
     }
 
+    /**
+     * A concurrent build can rewrite packages.json and drop the include it points to;
+     * the archives listed in that include are still needed and must not be purged.
+     */
+    #[TestDox('execute() aborts without removing archives when an included file is missing')]
+    public function testExecuteAbortsWhenIncludedFileIsMissing(): void
+    {
+        $outputDir = vfsStream::url('satis/output-missing-include');
+        mkdir($outputDir);
+        $archiveDir = $outputDir . '/dist';
+        mkdir($archiveDir . '/vendor', 0755, true);
+
+        $archiveFile = $archiveDir . '/vendor/package.tar.gz';
+        file_put_contents($archiveFile, 'a');
+
+        $includeFile = 'include/all$missing.json';
+        $this->writeOutputRepository($outputDir, $this->packageEntry(
+            'vendor/package',
+            '1.0.0',
+            'https://example.com/dist/vendor/package.tar.gz'
+        ), $includeFile);
+        unlink($outputDir . '/' . $includeFile);
+
+        $this->writeSatisConfig([
+            'name' => 'test/satis-repo',
+            'homepage' => 'https://example.com',
+            'output-dir' => $outputDir,
+            'archive' => [
+                'directory' => 'dist',
+                'prefix-url' => 'https://example.com',
+            ],
+        ]);
+
+        $tester = $this->createTester();
+        $exception = null;
+
+        try {
+            $tester->execute([
+                'file' => $this->configPath,
+                'output-dir' => $outputDir,
+            ]);
+        } catch (\RuntimeException $exception) {
+        }
+
+        self::assertInstanceOf(\RuntimeException::class, $exception);
+        self::assertStringContainsString($includeFile . '\' does not exist', $exception->getMessage());
+        self::assertFileExists($archiveFile);
+    }
+
     // --- Dry-run ---
 
     #[TestDox('execute() does not remove archives or empty dirs when dry-run is enabled')]
